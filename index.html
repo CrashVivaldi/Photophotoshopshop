@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Photophotoshopshop</title>
+  <style>
+    :root {
+      --bg: #0f0f12;
+      --surface: #1a1a22;
+      --border: #2a2a36;
+      --text: #e8e8ef;
+      --muted: #8888a0;
+      --accent: #7c6cff;
+      --accent-hover: #9588ff;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.5;
+    }
+
+    header {
+      padding: 3rem 1.5rem 2rem;
+      text-align: center;
+      border-bottom: 1px solid var(--border);
+    }
+
+    header h1 {
+      font-size: 1.75rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+
+    header p {
+      color: var(--muted);
+      margin-top: 0.5rem;
+      max-width: 36rem;
+      margin-inline: auto;
+    }
+
+    main {
+      max-width: 56rem;
+      margin: 0 auto;
+      padding: 2rem 1.5rem 4rem;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+      gap: 1rem;
+    }
+
+    .tile {
+      display: block;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem;
+      text-decoration: none;
+      color: inherit;
+      transition: border-color 0.15s, transform 0.15s;
+    }
+
+    .tile:hover {
+      border-color: var(--accent);
+      transform: translateY(-2px);
+    }
+
+    .tile h2 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-bottom: 0.35rem;
+    }
+
+    .tile p {
+      font-size: 0.875rem;
+      color: var(--muted);
+    }
+
+    .tag {
+      display: inline-block;
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--accent);
+      margin-bottom: 0.75rem;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Photophotoshopshop</h1>
+    <p>Browser-based image tools — no install, no AI, no server round-trip.</p>
+  </header>
+  <main>
+    <div class="grid">
+      <a class="tile" href="layer-split.html">
+        <span class="tag">New</span>
+        <h2>Color Layer Split</h2>
+        <p>Photo of a drawing in → layered PSD out, one layer per distinct color.</p>
+      </a>
+    </div>
+  </main>
+</body>
+</html>
