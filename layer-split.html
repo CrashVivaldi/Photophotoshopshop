@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Color Layer Split — Photophotoshopshop</title>
+  <style>
+    :root {
+      --bg: #0f0f12;
+      --surface: #1a1a22;
+      --surface2: #22222c;
+      --border: #2a2a36;
+      --text: #e8e8ef;
+      --muted: #8888a0;
+      --accent: #7c6cff;
+      --accent-hover: #9588ff;
+      --danger: #ff6b6b;
+      --ok: #5cdb95;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.5;
+    }
+
+    a { color: var(--accent); }
+
+    header {
+      padding: 1.25rem 1.5rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    header h1 {
+      font-size: 1.15rem;
+      font-weight: 600;
+    }
+
+    header .back {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 0.875rem;
+    }
+
+    header .back:hover { color: var(--text); }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 18rem 1fr;
+      min-height: calc(100vh - 57px);
+    }
+
+    @media (max-width: 800px) {
+      .layout { grid-template-columns: 1fr; }
+    }
+
+    .sidebar {
+      border-right: 1px solid var(--border);
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1rem;
+    }
+
+    .panel h2 {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin-bottom: 0.75rem;
+    }
+
+    .dropzone {
+      border: 2px dashed var(--border);
+      border-radius: 8px;
+      padding: 1.5rem 1rem;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+    }
+
+    .dropzone:hover, .dropzone.dragover {
+      border-color: var(--accent);
+      background: rgba(124, 108, 255, 0.06);
+    }
+
+    .dropzone p { font-size: 0.875rem; color: var(--muted); }
+    .dropzone strong { color: var(--text); display: block; margin-bottom: 0.25rem; }
+
+    .dropzone input { display: none; }
+
+    .control { margin-bottom: 0.85rem; }
+    .control:last-child { margin-bottom: 0; }
+
+    .control label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.8125rem;
+      margin-bottom: 0.35rem;
+    }
+
+    .control label span.value {
+      color: var(--accent);
+      font-variant-numeric: tabular-nums;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+    }
+
+    .checkbox {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.5rem;
+      font-size: 0.8125rem;
+      cursor: pointer;
+    }
+
+    .checkbox input { margin-top: 0.15rem; accent-color: var(--accent); }
+
+    .btn {
+      display: block;
+      width: 100%;
+      padding: 0.65rem 1rem;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.875rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s, opacity 0.15s;
+    }
+
+    .btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    .btn-primary:not(:disabled):hover { background: var(--accent-hover); }
+
+    .btn-secondary {
+      background: var(--surface2);
+      color: var(--text);
+      border: 1px solid var(--border);
+      margin-top: 0.5rem;
+    }
+
+    .btn-secondary:not(:disabled):hover { border-color: var(--muted); }
+
+    .status {
+      font-size: 0.8125rem;
+      color: var(--muted);
+      min-height: 1.25rem;
+    }
+
+    .status.error { color: var(--danger); }
+    .status.ok { color: var(--ok); }
+
+    .workspace {
+      padding: 1.25rem;
+      overflow: auto;
+    }
+
+    .preview-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+
+    @media (max-width: 900px) {
+      .preview-row { grid-template-columns: 1fr; }
+    }
+
+    .preview-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    .preview-box h3 {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      padding: 0.65rem 0.85rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .preview-canvas-wrap {
+      background:
+        repeating-conic-gradient(#2a2a36 0% 25%, #1a1a22 0% 50%) 50% / 16px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 12rem;
+      max-height: 28rem;
+      overflow: auto;
+      padding: 0.5rem;
+    }
+
+    .preview-canvas-wrap canvas {
+      max-width: 100%;
+      max-height: 26rem;
+      image-rendering: auto;
+    }
+
+    .layers-section h3 {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      margin-bottom: 0.75rem;
+    }
+
+    .layers-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(7rem, 1fr));
+      gap: 0.65rem;
+    }
+
+    .layer-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .layer-thumb {
+      aspect-ratio: 1;
+      background:
+        repeating-conic-gradient(#2a2a36 0% 25%, #1a1a22 0% 50%) 50% / 12px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.35rem;
+    }
+
+    .layer-thumb canvas {
+      max-width: 100%;
+      max-height: 100%;
+    }
+
+    .layer-meta {
+      padding: 0.4rem 0.5rem;
+      font-size: 0.7rem;
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+
+    .swatch {
+      width: 0.75rem;
+      height: 0.75rem;
+      border-radius: 2px;
+      border: 1px solid rgba(255,255,255,0.15);
+      flex-shrink: 0;
+    }
+
+    .note {
+      font-size: 0.75rem;
+      color: var(--muted);
+      margin-top: 0.5rem;
+      line-height: 1.45;
+    }
+
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 20rem;
+      color: var(--muted);
+      text-align: center;
+      padding: 2rem;
+    }
+
+    .empty-state svg {
+      opacity: 0.35;
+      margin-bottom: 1rem;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <a class="back" href="index.html">← All tools</a>
+    <h1>Color Layer Split</h1>
+  </header>
+
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="panel">
+        <h2>Source image</h2>
+        <label class="dropzone" id="dropzone">
+          <input type="file" id="fileInput" accept="image/*">
+          <strong>Drop a photo here</strong>
+          <p>or click to browse · JPG, PNG, HEIC…</p>
+        </label>
+        <p class="note">Best results with a flat, square-on shot and even lighting. Crop/straighten before uploading if needed.</p>
+      </div>
+
+      <div class="panel">
+        <h2>Settings</h2>
+        <div class="control">
+          <label>
+            Color count
+            <span class="value" id="colorCountLabel">12</span>
+          </label>
+          <input type="range" id="colorCount" min="4" max="32" value="12">
+        </div>
+        <div class="control">
+          <label>
+            Max dimension
+            <span class="value" id="maxDimLabel">2048 px</span>
+          </label>
+          <input type="range" id="maxDim" min="800" max="4096" step="256" value="2048">
+        </div>
+        <div class="control">
+          <label class="checkbox">
+            <input type="checkbox" id="keepPaper">
+            Keep paper as bottom background layer
+          </label>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Export</h2>
+        <button class="btn btn-primary" id="processBtn" disabled>Split into layers</button>
+        <button class="btn btn-secondary" id="downloadBtn" disabled>Download PSD</button>
+        <p class="status" id="status"></p>
+      </div>
+    </aside>
+
+    <main class="workspace">
+      <div id="emptyState" class="empty-state">
+        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <rect x="3" y="3" width="18" height="18" rx="2"/>
+          <path d="M3 15l5-5 4 4 3-3 6 6"/>
+          <circle cx="8.5" cy="8.5" r="1.5"/>
+        </svg>
+        <p>Upload a photo of a drawing to get started.</p>
+      </div>
+
+      <div id="results" hidden>
+        <div class="preview-row">
+          <div class="preview-box">
+            <h3>Original (processed size)</h3>
+            <div class="preview-canvas-wrap" id="originalPreview"></div>
+          </div>
+          <div class="preview-box">
+            <h3>Quantized preview</h3>
+            <div class="preview-canvas-wrap" id="quantizedPreview"></div>
+          </div>
+        </div>
+        <div class="layers-section">
+          <h3>Layers (<span id="layerCount">0</span>)</h3>
+          <div class="layers-grid" id="layersGrid"></div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script type="module">
+    import { writePsd } from 'https://cdn.jsdelivr.net/npm/ag-psd@31.0.2/+esm';
+    import {
+      buildPaletteSync,
+      applyPaletteSync,
+      utils,
+      conversion,
+    } from 'https://cdn.jsdelivr.net/npm/image-q@4.0.0/dist/esm/image-q.mjs';
+
+    const fileInput = document.getElementById('fileInput');
+    const dropzone = document.getElementById('dropzone');
+    const colorCount = document.getElementById('colorCount');
+    const colorCountLabel = document.getElementById('colorCountLabel');
+    const maxDim = document.getElementById('maxDim');
+    const maxDimLabel = document.getElementById('maxDimLabel');
+    const keepPaper = document.getElementById('keepPaper');
+    const processBtn = document.getElementById('processBtn');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const statusEl = document.getElementById('status');
+    const emptyState = document.getElementById('emptyState');
+    const results = document.getElementById('results');
+    const originalPreview = document.getElementById('originalPreview');
+    const quantizedPreview = document.getElementById('quantizedPreview');
+    const layersGrid = document.getElementById('layersGrid');
+    const layerCountEl = document.getElementById('layerCount');
+
+    let sourceImage = null;
+    let lastPsdBuffer = null;
+    let lastFileName = 'drawing';
+
+    colorCount.addEventListener('input', () => {
+      colorCountLabel.textContent = colorCount.value;
+    });
+
+    maxDim.addEventListener('input', () => {
+      maxDimLabel.textContent = `${maxDim.value} px`;
+    });
+
+    function setStatus(msg, type = '') {
+      statusEl.textContent = msg;
+      statusEl.className = 'status' + (type ? ` ${type}` : '');
+    }
+
+    function loadImageFromFile(file) {
+      if (!file.type.startsWith('image/')) {
+        setStatus('Please choose an image file.', 'error');
+        return;
+      }
+      lastFileName = file.name.replace(/\.[^.]+$/, '') || 'drawing';
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        sourceImage = img;
+        processBtn.disabled = false;
+        downloadBtn.disabled = true;
+        lastPsdBuffer = null;
+        results.hidden = true;
+        emptyState.hidden = false;
+        setStatus(`Loaded ${file.name} (${img.naturalWidth}×${img.naturalHeight})`, 'ok');
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        setStatus('Could not load that image.', 'error');
+      };
+      img.src = url;
+    }
+
+    dropzone.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', () => {
+      if (fileInput.files[0]) loadImageFromFile(fileInput.files[0]);
+    });
+
+    dropzone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropzone.classList.add('dragover');
+    });
+    dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+    dropzone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropzone.classList.remove('dragover');
+      if (e.dataTransfer.files[0]) loadImageFromFile(e.dataTransfer.files[0]);
+    });
+
+    function imageToCanvas(img, maxSize) {
+      let w = img.naturalWidth;
+      let h = img.naturalHeight;
+      if (Math.max(w, h) > maxSize) {
+        const scale = maxSize / Math.max(w, h);
+        w = Math.round(w * scale);
+        h = Math.round(h * scale);
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      ctx.drawImage(img, 0, 0, w, h);
+      return canvas;
+    }
+
+    function colorsEqual(a, b) {
+      return a.r === b.r && a.g === b.g && a.b === b.b;
+    }
+
+    function colorToHex(r, g, b) {
+      return '#' + [r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('');
+    }
+
+    function isLightPaperColor(r, g, b) {
+      const lab = conversion.rgb2lab(r, g, b);
+      return lab.L > 85 && Math.abs(lab.a) < 18 && Math.abs(lab.b) < 18;
+    }
+
+    function largestComponentSize(indices, width, height, targetIndex) {
+      const visited = new Uint8Array(width * height);
+      let maxSize = 0;
+      const stack = [];
+
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          const start = y * width + x;
+          if (indices[start] !== targetIndex || visited[start]) continue;
+
+          let size = 0;
+          stack.push(start);
+          visited[start] = 1;
+
+          while (stack.length) {
+            const idx = stack.pop();
+            size++;
+            const px = idx % width;
+            const py = (idx / width) | 0;
+
+            const neighbors = [
+              px > 0 ? idx - 1 : -1,
+              px < width - 1 ? idx + 1 : -1,
+              py > 0 ? idx - width : -1,
+              py < height - 1 ? idx + width : -1,
+            ];
+
+            for (const n of neighbors) {
+              if (n >= 0 && !visited[n] && indices[n] === targetIndex) {
+                visited[n] = 1;
+                stack.push(n);
+              }
+            }
+          }
+
+          if (size > maxSize) maxSize = size;
+        }
+      }
+      return maxSize;
+    }
+
+    function detectPaperIndex(paletteColors, indices, width, height) {
+      let bestIndex = -1;
+      let bestScore = 0;
+
+      for (let i = 0; i < paletteColors.length; i++) {
+        const c = paletteColors[i];
+        if (!isLightPaperColor(c.r, c.g, c.b)) continue;
+
+        const componentSize = largestComponentSize(indices, width, height, i);
+        if (componentSize > bestScore) {
+          bestScore = componentSize;
+          bestIndex = i;
+        }
+      }
+
+      return bestIndex;
+    }
+
+    function buildLayerCanvas(width, height, rgba, paletteIndex, colorIndex, targetColor) {
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      const imageData = ctx.createImageData(width, height);
+      const out = imageData.data;
+
+      for (let i = 0, p = 0; i < rgba.length; i += 4, p++) {
+        if (colorIndex[p] === paletteIndex) {
+          out[i] = targetColor.r;
+          out[i + 1] = targetColor.g;
+          out[i + 2] = targetColor.b;
+          out[i + 3] = 255;
+        }
+      }
+
+      ctx.putImageData(imageData, 0, 0);
+      return canvas;
+    }
+
+    function mountCanvas(container, canvas) {
+      container.replaceChildren(canvas);
+    }
+
+    function renderLayerCards(layers) {
+      layersGrid.replaceChildren();
+      layerCountEl.textContent = String(layers.length);
+
+      for (const layer of layers) {
+        const card = document.createElement('div');
+        card.className = 'layer-card';
+
+        const thumb = document.createElement('div');
+        thumb.className = 'layer-thumb';
+        const mini = document.createElement('canvas');
+        const maxThumb = 120;
+        const scale = Math.min(maxThumb / layer.canvas.width, maxThumb / layer.canvas.height, 1);
+        mini.width = Math.round(layer.canvas.width * scale);
+        mini.height = Math.round(layer.canvas.height * scale);
+        mini.getContext('2d').drawImage(layer.canvas, 0, 0, mini.width, mini.height);
+        thumb.appendChild(mini);
+
+        const meta = document.createElement('div');
+        meta.className = 'layer-meta';
+        const swatch = document.createElement('span');
+        swatch.className = 'swatch';
+        swatch.style.background = layer.hex;
+        meta.append(swatch, document.createTextNode(layer.name));
+
+        card.append(thumb, meta);
+        layersGrid.appendChild(card);
+      }
+    }
+
+    async function processImage() {
+      if (!sourceImage) return;
+
+      processBtn.disabled = true;
+      downloadBtn.disabled = true;
+      setStatus('Processing…');
+
+      await new Promise((r) => setTimeout(r, 0));
+
+      try {
+        const maxSize = parseInt(maxDim.value, 10);
+        const numColors = parseInt(colorCount.value, 10);
+        const srcCanvas = imageToCanvas(sourceImage, maxSize);
+        const width = srcCanvas.width;
+        const height = srcCanvas.height;
+        const ctx = srcCanvas.getContext('2d');
+        const imageData = ctx.getImageData(0, 0, width, height);
+
+        const pointContainer = utils.PointContainer.fromUint8Array(
+          imageData.data,
+          width,
+          height,
+        );
+
+        const palette = buildPaletteSync([pointContainer], {
+          colors: numColors,
+          colorDistanceFormula: 'cie94-graphic-arts',
+          paletteQuantization: 'wuquant',
+        });
+
+        const quantized = applyPaletteSync(pointContainer, palette, {
+          colorDistanceFormula: 'cie94-graphic-arts',
+          imageQuantization: 'nearest',
+        });
+
+        const rgba = quantized.toUint8Array();
+        const paletteColors = palette.getPointContainer().getPointArray().map((p) => ({
+          r: p.r,
+          g: p.g,
+          b: p.b,
+          a: p.a,
+        }));
+
+        const colorIndex = new Int32Array(width * height);
+        for (let p = 0, i = 0; p < colorIndex.length; p++, i += 4) {
+          const r = rgba[i];
+          const g = rgba[i + 1];
+          const b = rgba[i + 2];
+          let idx = 0;
+          for (let j = 0; j < paletteColors.length; j++) {
+            const c = paletteColors[j];
+            if (c.r === r && c.g === g && c.b === b) {
+              idx = j;
+              break;
+            }
+          }
+          colorIndex[p] = idx;
+        }
+
+        const paperIndex = detectPaperIndex(paletteColors, colorIndex, width, height);
+        const includePaper = keepPaper.checked && paperIndex >= 0;
+
+        const quantizedCanvas = document.createElement('canvas');
+        quantizedCanvas.width = width;
+        quantizedCanvas.height = height;
+        quantizedCanvas.getContext('2d').putImageData(
+          new ImageData(new Uint8ClampedArray(rgba), width, height),
+          0,
+          0,
+        );
+
+        const layers = [];
+        const pixelCounts = new Int32Array(paletteColors.length);
+        for (let p = 0; p < colorIndex.length; p++) {
+          pixelCounts[colorIndex[p]]++;
+        }
+
+        const layerOrder = paletteColors
+          .map((c, i) => ({ i, count: pixelCounts[i] }))
+          .filter(({ i }) => includePaper || i !== paperIndex)
+          .sort((a, b) => {
+            if (includePaper && a.i === paperIndex) return -1;
+            if (includePaper && b.i === paperIndex) return 1;
+            return b.count - a.count;
+          });
+
+        for (const { i } of layerOrder) {
+          const c = paletteColors[i];
+          const isPaper = i === paperIndex;
+          const canvas = buildLayerCanvas(width, height, rgba, i, colorIndex, c);
+          const hex = colorToHex(c.r, c.g, c.b);
+          layers.push({
+            canvas,
+            name: isPaper ? 'Paper (background)' : hex,
+            hex,
+            isPaper,
+          });
+        }
+
+        const psdLayers = layers.map(({ canvas, name }) => ({
+          name,
+          canvas,
+          opacity: 1,
+          blendMode: 'normal',
+        }));
+
+        const compositeCanvas = document.createElement('canvas');
+        compositeCanvas.width = width;
+        compositeCanvas.height = height;
+        const cctx = compositeCanvas.getContext('2d');
+        for (const layer of layers) {
+          cctx.drawImage(layer.canvas, 0, 0);
+        }
+
+        const psd = {
+          width,
+          height,
+          children: psdLayers,
+          canvas: compositeCanvas,
+        };
+
+        lastPsdBuffer = writePsd(psd);
+
+        emptyState.hidden = true;
+        results.hidden = false;
+        mountCanvas(originalPreview, srcCanvas);
+        mountCanvas(quantizedPreview, quantizedCanvas);
+        renderLayerCards(layers);
+
+        const skipped = paperIndex >= 0 && !includePaper ? 1 : 0;
+        setStatus(
+          `Done — ${layers.length} layer${layers.length === 1 ? '' : 's'}${skipped ? ' (paper skipped)' : ''}.`,
+          'ok',
+        );
+        downloadBtn.disabled = false;
+      } catch (err) {
+        console.error(err);
+        setStatus(`Error: ${err.message}`, 'error');
+      } finally {
+        processBtn.disabled = !sourceImage;
+      }
+    }
+
+    processBtn.addEventListener('click', processImage);
+
+    downloadBtn.addEventListener('click', () => {
+      if (!lastPsdBuffer) return;
+      const blob = new Blob([lastPsdBuffer], { type: 'application/octet-stream' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `${lastFileName}-layers.psd`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+      setStatus('PSD downloaded.', 'ok');
+    });
+  </script>
+</body>
+</html>
