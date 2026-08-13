@@ -102,7 +102,25 @@
     .dropzone p { font-size: 0.875rem; color: var(--muted); }
     .dropzone strong { color: var(--text); display: block; margin-bottom: 0.25rem; }
 
-    .dropzone input { display: none; }
+    .dropzone.loaded {
+      border-color: var(--ok);
+      border-style: solid;
+    }
+
+    #dropzonePreview {
+      display: block;
+      max-width: 100%;
+      max-height: 9rem;
+      margin: 0.65rem auto 0;
+      border-radius: 6px;
+    }
+
+    #dropzonePreview[hidden] { display: none; }
+
+    .app-loading {
+      font-size: 0.8125rem;
+      color: var(--muted);
+    }
 
     .control { margin-bottom: 0.85rem; }
     .control:last-child { margin-bottom: 0; }
@@ -312,10 +330,13 @@
     <aside class="sidebar">
       <div class="panel">
         <h2>Source image</h2>
-        <label class="dropzone" id="dropzone">
-          <input type="file" id="fileInput" accept="image/*">
-          <strong>Drop a photo here</strong>
-          <p>or click to browse · JPG, PNG, HEIC…</p>
+        <input type="file" id="fileInput" accept="image/jpeg,image/png,image/webp,image/gif,image/heic,image/heif,.heic,.heif" hidden>
+        <label class="dropzone" id="dropzone" for="fileInput">
+          <div id="dropzonePrompt">
+            <strong>Drop a photo here</strong>
+            <p>or tap to browse · JPG, PNG, HEIC…</p>
+          </div>
+          <img id="dropzonePreview" hidden alt="Selected photo preview">
         </label>
         <p class="note">Best results with a flat, square-on shot and even lighting. Crop/straighten before uploading if needed.</p>
       </div>
@@ -348,7 +369,7 @@
         <h2>Export</h2>
         <button class="btn btn-primary" id="processBtn" disabled>Split into layers</button>
         <button class="btn btn-secondary" id="downloadBtn" disabled>Download PSD</button>
-        <p class="status" id="status"></p>
+        <p class="status app-loading" id="status">Loading…</p>
       </div>
     </aside>
 
@@ -381,6 +402,179 @@
     </main>
   </div>
 
+  <script>
+    window.__layerSplit = {
+      sourceImage: null,
+      lastFileName: 'drawing',
+      lastPsdBuffer: null,
+      ready: false,
+    };
+
+    (function initUpload() {
+      const fileInput = document.getElementById('fileInput');
+      const dropzone = document.getElementById('dropzone');
+      const dropzonePreview = document.getElementById('dropzonePreview');
+      const dropzonePrompt = document.getElementById('dropzonePrompt');
+      const processBtn = document.getElementById('processBtn');
+      const downloadBtn = document.getElementById('downloadBtn');
+      const statusEl = document.getElementById('status');
+      const emptyState = document.getElementById('emptyState');
+      const results = document.getElementById('results');
+
+      function setStatus(msg, type) {
+        statusEl.textContent = msg;
+        statusEl.className = 'status' + (type ? ' ' + type : '');
+      }
+
+      function isImageFile(file) {
+        if (file.type && file.type.startsWith('image/')) return true;
+        return /\.(jpe?g|png|gif|webp|heic|heif|bmp|tiff?)$/i.test(file.name);
+      }
+
+      function isHeicFile(file) {
+        return /\.heic$/i.test(file.name) || /\.heif$/i.test(file.name)
+          || file.type === 'image/heic' || file.type === 'image/heif';
+      }
+
+      async function blobToImage(blob) {
+        if (typeof createImageBitmap === 'function') {
+          try {
+            const bitmap = await createImageBitmap(blob);
+            const canvas = document.createElement('canvas');
+            canvas.width = bitmap.width;
+            canvas.height = bitmap.height;
+            canvas.getContext('2d').drawImage(bitmap, 0, 0);
+            bitmap.close();
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+            const img = new Image();
+            img.src = dataUrl;
+            await img.decode();
+            return img;
+          } catch (_) { /* fall through */ }
+        }
+
+        return new Promise((resolve, reject) => {
+          const url = URL.createObjectURL(blob);
+          const img = new Image();
+          img.onload = () => {
+            URL.revokeObjectURL(url);
+            const canvas = document.createElement('canvas');
+            canvas.width = img.naturalWidth;
+            canvas.height = img.naturalHeight;
+            canvas.getContext('2d').drawImage(img, 0, 0);
+            img.src = canvas.toDataURL('image/jpeg', 0.92);
+            resolve(img);
+          };
+          img.onerror = () => {
+            URL.revokeObjectURL(url);
+            reject(new Error('Could not decode image'));
+          };
+          img.src = url;
+        });
+      }
+
+      async function decodeFileToImage(file) {
+        let blob = file;
+        if (isHeicFile(file)) {
+          setStatus('Converting HEIC photo…');
+          const mod = await import('https://cdn.jsdelivr.net/npm/heic2any@0.0.4/+esm');
+          const heic2any = mod.default;
+          const converted = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.92 });
+          blob = Array.isArray(converted) ? converted[0] : converted;
+        }
+        return blobToImage(blob);
+      }
+
+      function showLoadedPreview(img, fileName) {
+        dropzone.classList.add('loaded');
+        dropzonePrompt.hidden = true;
+        dropzonePreview.hidden = false;
+        dropzonePreview.src = img.src;
+
+        results.hidden = true;
+        emptyState.hidden = false;
+        emptyState.replaceChildren();
+        const big = document.createElement('img');
+        big.src = img.src;
+        big.alt = 'Uploaded drawing preview';
+        big.style.maxWidth = '100%';
+        big.style.maxHeight = '24rem';
+        big.style.borderRadius = '8px';
+        const hint = document.createElement('p');
+        hint.style.marginTop = '1rem';
+        hint.textContent = 'Photo loaded — tap Split into layers when ready.';
+        emptyState.append(big, hint);
+      }
+
+      async function loadImageFromFile(file) {
+        if (!file) return;
+        if (!isImageFile(file)) {
+          setStatus('Please choose a JPG, PNG, or HEIC photo.', 'error');
+          return;
+        }
+
+        processBtn.disabled = true;
+        downloadBtn.disabled = true;
+        window.__layerSplit.lastPsdBuffer = null;
+        window.__layerSplit.lastFileName = file.name.replace(/\.[^.]+$/, '') || 'drawing';
+        setStatus('Loading photo…');
+
+        try {
+          const img = await decodeFileToImage(file);
+          window.__layerSplit.sourceImage = img;
+          showLoadedPreview(img, file.name);
+          processBtn.disabled = !window.__layerSplit.ready;
+          const dims = img.naturalWidth + '×' + img.naturalHeight;
+          if (window.__layerSplit.ready) {
+            setStatus('Loaded ' + file.name + ' (' + dims + ')', 'ok');
+          } else {
+            setStatus('Loaded ' + file.name + ' (' + dims + ') — starting up…', 'ok');
+          }
+        } catch (err) {
+          console.error(err);
+          window.__layerSplit.sourceImage = null;
+          dropzone.classList.remove('loaded');
+          dropzonePrompt.hidden = false;
+          dropzonePreview.hidden = true;
+          setStatus(err.message || 'Could not load that photo. Try JPG instead of HEIC.', 'error');
+        }
+      }
+
+      fileInput.addEventListener('change', () => {
+        loadImageFromFile(fileInput.files[0]);
+        fileInput.value = '';
+      });
+
+      dropzone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropzone.classList.add('dragover');
+      });
+      dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+      dropzone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropzone.classList.remove('dragover');
+        loadImageFromFile(e.dataTransfer.files[0]);
+      });
+
+      window.__layerSplit.setStatus = setStatus;
+      window.__layerSplit.onAppReady = function onAppReady() {
+        window.__layerSplit.ready = true;
+        if (window.__layerSplit.sourceImage) {
+          processBtn.disabled = false;
+          setStatus('Ready — tap Split into layers.', 'ok');
+        } else if (!statusEl.classList.contains('ok') && !statusEl.classList.contains('error')) {
+          setStatus('Ready — choose a photo.');
+        }
+      };
+
+      window.addEventListener('error', (e) => {
+        if (e.message && e.message.includes('import')) {
+          setStatus('Failed to load app libraries. Check your connection and refresh.', 'error');
+        }
+      });
+    })();
+  </script>
+
   <script type="module">
     import { writePsd } from 'https://cdn.jsdelivr.net/npm/ag-psd@31.0.2/+esm';
     import {
@@ -390,8 +584,7 @@
       conversion,
     } from 'https://cdn.jsdelivr.net/npm/image-q@4.0.0/dist/esm/image-q.mjs';
 
-    const fileInput = document.getElementById('fileInput');
-    const dropzone = document.getElementById('dropzone');
+    const app = window.__layerSplit;
     const colorCount = document.getElementById('colorCount');
     const colorCountLabel = document.getElementById('colorCountLabel');
     const maxDim = document.getElementById('maxDim');
@@ -399,7 +592,6 @@
     const keepPaper = document.getElementById('keepPaper');
     const processBtn = document.getElementById('processBtn');
     const downloadBtn = document.getElementById('downloadBtn');
-    const statusEl = document.getElementById('status');
     const emptyState = document.getElementById('emptyState');
     const results = document.getElementById('results');
     const originalPreview = document.getElementById('originalPreview');
@@ -407,9 +599,9 @@
     const layersGrid = document.getElementById('layersGrid');
     const layerCountEl = document.getElementById('layerCount');
 
-    let sourceImage = null;
-    let lastPsdBuffer = null;
-    let lastFileName = 'drawing';
+    function setStatus(msg, type = '') {
+      app.setStatus(msg, type);
+    }
 
     colorCount.addEventListener('input', () => {
       colorCountLabel.textContent = colorCount.value;
@@ -419,51 +611,7 @@
       maxDimLabel.textContent = `${maxDim.value} px`;
     });
 
-    function setStatus(msg, type = '') {
-      statusEl.textContent = msg;
-      statusEl.className = 'status' + (type ? ` ${type}` : '');
-    }
-
-    function loadImageFromFile(file) {
-      if (!file.type.startsWith('image/')) {
-        setStatus('Please choose an image file.', 'error');
-        return;
-      }
-      lastFileName = file.name.replace(/\.[^.]+$/, '') || 'drawing';
-      const url = URL.createObjectURL(file);
-      const img = new Image();
-      img.onload = () => {
-        URL.revokeObjectURL(url);
-        sourceImage = img;
-        processBtn.disabled = false;
-        downloadBtn.disabled = true;
-        lastPsdBuffer = null;
-        results.hidden = true;
-        emptyState.hidden = false;
-        setStatus(`Loaded ${file.name} (${img.naturalWidth}×${img.naturalHeight})`, 'ok');
-      };
-      img.onerror = () => {
-        URL.revokeObjectURL(url);
-        setStatus('Could not load that image.', 'error');
-      };
-      img.src = url;
-    }
-
-    dropzone.addEventListener('click', () => fileInput.click());
-    fileInput.addEventListener('change', () => {
-      if (fileInput.files[0]) loadImageFromFile(fileInput.files[0]);
-    });
-
-    dropzone.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      dropzone.classList.add('dragover');
-    });
-    dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
-    dropzone.addEventListener('drop', (e) => {
-      e.preventDefault();
-      dropzone.classList.remove('dragover');
-      if (e.dataTransfer.files[0]) loadImageFromFile(e.dataTransfer.files[0]);
-    });
+    app.onAppReady();
 
     function imageToCanvas(img, maxSize) {
       let w = img.naturalWidth;
@@ -609,7 +757,7 @@
     }
 
     async function processImage() {
-      if (!sourceImage) return;
+      if (!app.sourceImage) return;
 
       processBtn.disabled = true;
       downloadBtn.disabled = true;
@@ -620,7 +768,7 @@
       try {
         const maxSize = parseInt(maxDim.value, 10);
         const numColors = parseInt(colorCount.value, 10);
-        const srcCanvas = imageToCanvas(sourceImage, maxSize);
+        const srcCanvas = imageToCanvas(app.sourceImage, maxSize);
         const width = srcCanvas.width;
         const height = srcCanvas.height;
         const ctx = srcCanvas.getContext('2d');
@@ -729,7 +877,7 @@
           canvas: compositeCanvas,
         };
 
-        lastPsdBuffer = writePsd(psd);
+        app.lastPsdBuffer = writePsd(psd);
 
         emptyState.hidden = true;
         results.hidden = false;
@@ -747,18 +895,18 @@
         console.error(err);
         setStatus(`Error: ${err.message}`, 'error');
       } finally {
-        processBtn.disabled = !sourceImage;
+        processBtn.disabled = !app.sourceImage;
       }
     }
 
     processBtn.addEventListener('click', processImage);
 
     downloadBtn.addEventListener('click', () => {
-      if (!lastPsdBuffer) return;
-      const blob = new Blob([lastPsdBuffer], { type: 'application/octet-stream' });
+      if (!app.lastPsdBuffer) return;
+      const blob = new Blob([app.lastPsdBuffer], { type: 'application/octet-stream' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
-      a.download = `${lastFileName}-layers.psd`;
+      a.download = `${app.lastFileName}-layers.psd`;
       a.click();
       URL.revokeObjectURL(a.href);
       setStatus('PSD downloaded.', 'ok');
